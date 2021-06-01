@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/gofrs/uuid"
 )
 
 // Request is a request type that allows you to build a body for
@@ -14,12 +16,19 @@ type Request struct {
 	params  map[string]string
 	body    string
 	verb    string
+	id      string
 	test    *testing.T
 }
 
 // NewRequest prepares a start IRequest so you can integration test endpoints
 func NewRequest(t *testing.T) *Request {
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil
+	}
+
 	req := Request{
+		id:      id.String(),
 		headers: make(map[string]string),
 		query:   make(map[string]string),
 		test:    t,
@@ -109,6 +118,11 @@ func (req *Request) SetQueryParam(key string, arg string) *Request {
 // SetMultiQueryParam allows you to set an array of strings to the request's query param
 func (req *Request) SetMultiQueryParam(key string, arg []string) *Request {
 	return req.SetQueryParam(key, strings.Join(arg, ","))
+}
+
+// GetID gets the generated UUID for this test request
+func (req *Request) GetID() string {
+	return req.id
 }
 
 // ForContext provides a type translation for creating test contexts
