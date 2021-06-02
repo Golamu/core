@@ -28,6 +28,6 @@ func StartHTTP(handler HTTPEndpoint) {
 	Start(func(req ProxyRequest) (ProxyResponse, error) {
 		ctx := NewContext(req)
 		err := handler(ctx)
-		return ctx.Response.Respond(), err
+		return ctx.Respond(), err
 	})
 }

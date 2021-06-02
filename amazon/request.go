@@ -18,6 +18,11 @@ func NewRequest(arg events.APIGatewayProxyRequest) (req *Request) {
 	return &Request{arg}
 }
 
+// GetID gets this request's id from Amazon
+func (req *Request) GetID() string {
+	return req.RequestContext.RequestID
+}
+
 // GetHeader returns a header in string format. If there is more than 1 of this type, a
 // comma-separated version is returned
 func (req *Request) GetHeader(key string) string {

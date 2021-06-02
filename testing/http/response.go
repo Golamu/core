@@ -1,20 +1,25 @@
 package http
 
 import (
+	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/go-test/deep"
-	ohttp "github.com/Golamu/core/http"
 )
 
 // Response is a request type that allows you to easily test an endpoint's response
 // without having to build something yourself
 type Response struct {
-	headers map[string]string
-	query   map[string]string
-	code    int
-	body    interface{}
-	test    *testing.T
+	headers  map[string]string
+	query    map[string]string
+	code     int
+	body     interface{}
+	data     interface{}
+	test     *testing.T
+	errors   []string
+	messages []string
+	done     bool
 }
 
 // NewResponse allows you to have a default response for your testing purposes
@@ -24,14 +29,43 @@ func NewResponse(test *testing.T) *Response {
 		query:   make(map[string]string),
 		code:    200,
 		test:    test,
+		errors:  make([]string, 1),
+		done:    false,
 	}
 
 	return &resp
 }
 
+// AddError adds a string error message to the errors array
+func (res *Response) AddError(errs ...string) error {
+	for _, msg := range errs {
+		res.errors = append(res.errors, msg)
+	}
+
+	return nil
+}
+
+// AddMessage adds a string message message to the messages array
+func (res *Response) AddMessage(errs ...string) error {
+	if res.done {
+		return errors.New("Response has already been completed, cannot add messages")
+	}
+
+	for _, msg := range errs {
+		res.messages = append(res.messages, msg)
+	}
+
+	return nil
+}
+
 // SetHeader allows the endpoint to set a header for future testing
-func (res *Response) SetHeader(key, value string) {
+func (res *Response) SetHeader(key, value string) error {
+	if res.done {
+		return errors.New("Response has already been completed, cannot add messages")
+	}
+
 	res.headers[key] = value
+	return nil
 }
 
 // HeaderMatches yes
@@ -54,10 +88,24 @@ func (res *Response) GetHeader(key string) string {
 	return ""
 }
 
-// SetBody allows the user to assign any value to the body
-func (res *Response) SetBody(arg interface{}) error {
+// SetBody allows the user to assign any value to the body. We marshal the argument to verify
+// that the endpoint is responding properly to marshalling errors
+func (res *Response) SetBody(arg interface{}) (err error) {
+	if res.done {
+		return errors.New("Unable to set body because response has already been finished")
+	}
+
 	res.body = arg
-	return nil
+
+	_, err = json.Marshal(arg)
+
+	return
+}
+
+// SetData simply sets the data property for this object
+func (res *Response) SetData(arg interface{}) (err error) {
+	res.data = arg
+	return
 }
 
 // GetBody allows you to retrieve the body as it was assigned
@@ -66,9 +114,13 @@ func (res *Response) GetBody() interface{} {
 }
 
 // SetCode allows the user to assign an HTTP status code to the request
-func (res *Response) SetCode(code int) {
+func (res *Response) SetCode(code int) error {
+	if res.done {
+		return errors.New("Unable to set code because response has already been finished")
+	}
+
 	res.code = code
-	return
+	return nil
 }
 
 // HasStatus asserts that the response has the given status code
@@ -84,43 +136,39 @@ func (res *Response) HasStatus(code int) *Response {
 
 // HasMessage assert that the response has been assigned a specific message
 func (res *Response) HasMessage(arg string) *Response {
-	msg, ok := res.body.(ohttp.MessageResponse)
-	if !ok {
-		res.test.Errorf("Body is not of type MessageResponse")
+	if arg == "" {
 		return res
 	}
 
-	if msg.Message != arg {
-		res.test.Errorf("Messages do not match.\n\tExpected: %s\n---\n\n\tGot: %s", arg, msg.Message)
+	for _, msg := range res.messages {
+		if msg == arg {
+			return res
+		}
 	}
 
+	res.test.Errorf("Messages not found.\n\tExpected: %s\n---\n\n", arg)
 	return res
 }
 
 // HasError asserts that the user has set a proper ErrorResponse
 func (res *Response) HasError(err string, code int, msg string) *Response {
-	body, ok := res.body.(ohttp.ErrorResponse)
-	if !ok {
-		res.test.Errorf("Body is not of type ErrorResponse")
+	if err == "" {
 		return res
 	}
 
-	errFormat := "%s do not match.\n\tExpected: %s\n----\n\n\tGot: %s"
-
-	if body.Message != msg {
-		res.test.Errorf(errFormat, "Messages", msg, body.Message)
+	for _, msg := range res.errors {
+		if msg == err {
+			return res.HasMessage(msg).HasStatus(code)
+		}
 	}
 
-	if body.Error != err {
-		res.test.Errorf(errFormat, "Errors", err, body.Error)
-	}
-
-	return res.HasStatus(code)
+	res.test.Errorf("Errors not found.\n\tExpected: %s\n---\n\n", err)
+	return res
 }
 
-// BodyMatches assert that the body of the response matches a given value
-func (res *Response) BodyMatches(arg interface{}) *Response {
-	if diff := deep.Equal(res.body, arg); diff != nil {
+// DataMatches asserts that the body of the response matches a given value
+func (res *Response) DataMatches(arg interface{}) *Response {
+	if diff := deep.Equal(res.data, arg); diff != nil {
 		res.test.Error(diff)
 		res.test.FailNow()
 	}
@@ -141,17 +189,10 @@ func (res *Response) LogBody() *Response {
 	return res
 }
 
-// SetMessage allows the user to respond with a message
-func (res *Response) SetMessage(msg string) error {
-	resp := ohttp.MessageResponse{Message: msg}
-	return res.SetBody(resp)
-}
-
-// SetError allows the user to quickly and easily respond with an error
-func (res *Response) SetError(code int, message, errorMessage string) error {
-	res.code = code
-	resp := ohttp.ErrorResponse{Error: errorMessage, Message: message}
-	return res.SetBody(resp)
+// Finish sets the "done" flag
+func (res *Response) Finish() error {
+	res.done = true
+	return nil
 }
 
 // ForContext provides an easy type-cast for IContext

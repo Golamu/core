@@ -9,4 +9,5 @@ require (
 	github.com/go-pg/pg/v10 v10.7.6
 	github.com/go-playground/validator/v10 v10.4.1
 	github.com/go-test/deep v1.0.7
+	github.com/gofrs/uuid v4.0.0+incompatible
 )

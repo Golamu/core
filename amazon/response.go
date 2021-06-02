@@ -2,31 +2,87 @@ package amazon
 
 import (
 	"encoding/json"
+	"errors"
+	"strings"
+	"time"
 
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/Golamu/core/http"
+	"github.com/aws/aws-lambda-go/events"
 )
 
 // Response is the type that is compatible with both our controllers, and Amazon
 type Response struct {
 	events.APIGatewayProxyResponse
+	requestID string
+	messages  []string
+	errors    []string
+	data      interface{}
+	done      bool
+	started   time.Time
 }
 
-// NewResponse creates a new response with sensible defaults
-func NewResponse() *Response {
+// NewResponse creates a new response with sensible defaults, including the BaseResponse from
+// this package. Note if you reassign
+func NewResponse(req *Request) *Response {
+	verb := req.GetMethod()
+	code := http.GetVerbStatus(strings.ToUpper(verb))
+
 	evt := events.APIGatewayProxyResponse{
-		StatusCode:      200,
+		StatusCode:      code,
 		IsBase64Encoded: false,
 		Headers: map[string]string{
 			"content-type": "application/json",
 		},
 	}
-	return &Response{evt}
+
+	resp := &Response{
+		evt,
+		req.GetID(),
+		make([]string, 0),
+		make([]string, 0),
+		nil,
+		false,
+		time.Now().UTC(),
+	}
+
+	return resp
+}
+
+// AddError adds a new error to the response ONLY WHEN custom data has never been set
+func (res *Response) AddError(errs ...string) error {
+	if res.done {
+		return errors.New("Cannot add errors to a finished response")
+	}
+
+	for _, err := range errs {
+		res.errors = append(res.errors, err)
+	}
+
+	return nil
+}
+
+// AddMessage adds a new message to the response ONLY WHEN custom data has never been set
+func (res *Response) AddMessage(errs ...string) error {
+	if res.done {
+		return errors.New("Cannot add messages to a finished response")
+	}
+
+	for _, err := range errs {
+		res.messages = append(res.messages, err)
+	}
+
+	return nil
 }
 
 // SetHeader sets the `key` HTTP header on the response object to `value`
-func (res *Response) SetHeader(key, value string) {
+func (res *Response) SetHeader(key, value string) error {
+	if res.done {
+		return errors.New("Unable to set a header on a finished response")
+	}
+
 	res.Headers[key] = value
+
+	return nil
 }
 
 // GetHeader returns the `key` HTTP header that's already set on the response object
@@ -34,12 +90,14 @@ func (res *Response) GetHeader(key string) string {
 	return res.Headers[key]
 }
 
-// SetBody overwrites the body with the json marshaled version of arg
+// SetBody overwrites the body with your own type. It will disable AddMessage and AddError if you
+// use this and pass anything except BaseResponse, so use SetData instead if you are not
+// looking to completely replace this
 func (res *Response) SetBody(arg interface{}) (err error) {
-	var body []byte
 
-	if body, err = json.Marshal(arg); err != nil {
-		return
+	body, err := json.Marshal(arg)
+	if err != nil {
+		return err
 	}
 
 	res.Body = string(body)
@@ -47,34 +105,56 @@ func (res *Response) SetBody(arg interface{}) (err error) {
 	return nil
 }
 
-// SetCode sets the StatusCode on the amazon response
-func (res *Response) SetCode(num int) {
-	res.StatusCode = num
-}
-
-// SetMessage overwrites the body with a MessageResponse type
-func (res *Response) SetMessage(msg string) error {
-	resp := http.MessageResponse{Message: msg}
-	return res.SetBody(resp)
-}
-
-// SetError overwrites the body with an ErrorResponse type
-func (res *Response) SetError(code int, message, errorMessage string) error {
-	resp := http.ErrorResponse{
-		Message: message,
-		Error:   errorMessage,
+// SetData sets the data to be marshalled at the end of the request
+func (res *Response) SetData(arg interface{}) error {
+	if res.done {
+		return errors.New("Unable to set data on finished response")
 	}
 
-	err := res.SetBody(resp)
-	if err != nil {
-		return err
-	}
+	res.data = arg
 
-	res.SetCode(code)
 	return nil
 }
 
-// Respond gives the APIGatewayProxyResponse for use in the endpoint handlers
-func (res *Response) Respond() events.APIGatewayProxyResponse {
-	return res.APIGatewayProxyResponse
+// SetCode sets the StatusCode on the amazon response
+func (res *Response) SetCode(num int) error {
+	if res.done {
+		return errors.New("Unable to set code on finished response")
+	}
+
+	res.StatusCode = num
+	return nil
+}
+
+// Finish locks the response so that nobody can alter it after it has been finished
+func (res *Response) Finish() (err error) {
+	if res.done {
+		return
+	}
+
+	res.done = true
+
+	if res.Body != "" {
+		return
+	}
+
+	took := time.Since(res.started).Milliseconds()
+
+	resp := http.BaseResponse{
+		StatusCode: res.StatusCode,
+		RequestID:  res.requestID,
+		TimeTaken:  took,
+		Data:       res.data,
+		Messages:   res.messages,
+		Errors:     res.errors,
+	}
+
+	var body []byte
+	if body, err = json.Marshal(resp); err != nil {
+		return err
+	}
+
+	res.Body = string(body)
+
+	return nil
 }

@@ -3,8 +3,8 @@ package amazon
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 
+	"github.com/Golamu/core"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -15,44 +15,55 @@ import (
 func GetAWSSecret(name, region string) (secret string, err error) {
 
 	//Create a Secrets Manager client
+	core.Debug("Creating service")
 	svc := mgr.New(session.New(), aws.NewConfig().WithRegion(region))
 
+	core.Debug("Creating input value")
 	input := &mgr.GetSecretValueInput{SecretId: aws.String(name)}
 
 	// In this sample we only handle the specific exceptions for the 'GetSecretValue' API.
 	// See https://docs.aws.amazon.com/mgr/latest/apireference/API_GetSecretValue.html
 
+	core.Debug("Pulling secret from amazon")
 	result, err := svc.GetSecretValue(input)
+	core.Debug("Done retrieving, processing error")
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case mgr.ErrCodeDecryptionFailure:
 				// Secrets Manager can't decrypt the protected secret text using the provided KMS key.
-				fmt.Println(mgr.ErrCodeDecryptionFailure, aerr.Error())
+				core.Error(mgr.ErrCodeDecryptionFailure, aerr.Error())
+				break
 
 			case mgr.ErrCodeInternalServiceError:
 				// An error occurred on the server side.
-				fmt.Println(mgr.ErrCodeInternalServiceError, aerr.Error())
+				core.Error(mgr.ErrCodeInternalServiceError, aerr.Error())
+				break
 
 			case mgr.ErrCodeInvalidParameterException:
 				// You provided an invalid value for a parameter.
-				fmt.Println(mgr.ErrCodeInvalidParameterException, aerr.Error())
+				core.Error(mgr.ErrCodeInvalidParameterException, aerr.Error())
+				break
 
 			case mgr.ErrCodeInvalidRequestException:
 				// You provided a parameter value that is not valid for the current state of the resource.
-				fmt.Println(mgr.ErrCodeInvalidRequestException, aerr.Error())
+				core.Error(mgr.ErrCodeInvalidRequestException, aerr.Error())
+				break
 
 			case mgr.ErrCodeResourceNotFoundException:
 				// We can't find the resource that you asked for.
-				fmt.Println(mgr.ErrCodeResourceNotFoundException, aerr.Error())
+				core.Error(mgr.ErrCodeResourceNotFoundException, aerr.Error())
+				break
 			}
 		} else {
 			// Print the error, cast err to awserr.Error to get the Code and
 			// Message from an error.
-			fmt.Println(err.Error())
+			core.Error(err.Error())
 		}
 		return
 	}
+
+	core.Debug("No errors")
 
 	// Decrypts secret using the associated KMS CMK.
 	// Depending on whether the secret is a string or binary, one of these fields will be populated.
@@ -61,15 +72,18 @@ func GetAWSSecret(name, region string) (secret string, err error) {
 		return
 	}
 
+	core.Debug("Decoding secrets")
 	var size int
 	byteCount := base64.StdEncoding.DecodedLen(len(result.SecretBinary))
 	decodedBinarySecretBytes := make([]byte, byteCount)
 	size, err = base64.StdEncoding.Decode(decodedBinarySecretBytes, result.SecretBinary)
 
 	if err != nil {
-		fmt.Println("Base64 Decode Error:", err)
+		core.Error("Base64 Decode Error:", err)
 		return
 	}
+
+	core.Debug("Decoded")
 	secret = string(decodedBinarySecretBytes[:size])
 
 	return
