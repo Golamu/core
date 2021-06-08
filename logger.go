@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"os"
+	"time"
 )
 
 var minLevel uint8
@@ -72,4 +73,15 @@ func Error(msg string, args ...interface{}) {
 
 	full := "[ERROR] " + msg + "\n"
 	fmt.Printf(full, args...)
+}
+
+// Time prints a [TIME] message, has the same weight as a debug
+func Time(since time.Time) {
+	if minLevel > levels["DEBUG"] {
+		return
+	}
+
+	ms := time.Since(since).Milliseconds()
+	full := fmt.Sprintf("[TIMER] %d", ms)
+	fmt.Println(full)
 }
