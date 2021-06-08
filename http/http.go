@@ -39,11 +39,6 @@ type IContext interface {
 	AddError(err ...string)
 	AddMessage(message ...string)
 
-	SetData(arg map[string]interface{})
-	SetDataAt(key string, arg interface{})
-	GetDataAt(key string) interface{}
-	GetData() map[string]interface{}
-
 	// Return this request to the client
 	Send()
 	IsDone() bool

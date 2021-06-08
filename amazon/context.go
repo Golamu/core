@@ -10,7 +10,6 @@ import (
 // Context is the Amazon context created by a handler to pass into a controller
 // handler
 type Context struct {
-	http.IContext
 	request     *Request
 	response    *Response
 	started     time.Time
@@ -58,6 +57,11 @@ func (ctx *Context) GetDoneChannel() chan bool {
 // AddError is an easy way to add a messages to the body of the response
 func (ctx *Context) AddError(msgs ...string) {
 	ctx.response.AddError(msgs...)
+}
+
+// AddMessage is a binding to the response's "AddMessage" method
+func (ctx *Context) AddMessage(arg ...string) {
+	ctx.GetResponse().AddMessage(arg...)
 }
 
 // Send sends the "done" message so we can reply to the client. Ignores multiple calls
