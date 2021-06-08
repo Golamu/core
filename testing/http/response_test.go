@@ -9,6 +9,6 @@ import (
 
 func Test_BuildsResponse(t *testing.T) {
 	confirm := func(ctx base.IResponse) {}
-	data := http.Response{}
+	data := &http.Response{}
 	confirm(data)
 }

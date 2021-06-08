@@ -34,6 +34,11 @@ func NewContext(req events.APIGatewayProxyRequest) *Context {
 	return ctx
 }
 
+// IsDone returns whether or not the response has been finalized
+func (ctx *Context) IsDone() bool {
+	return ctx.done
+}
+
 // GetRequest gets the context's request object
 func (ctx *Context) GetRequest() http.IRequest {
 	return ctx.request
@@ -71,4 +76,9 @@ func (ctx *Context) Send() {
 	}
 
 	ctx.doneChannel <- true
+}
+
+// Started returns the time that this context was initialized
+func (ctx *Context) Started() time.Time {
+	return ctx.started
 }
