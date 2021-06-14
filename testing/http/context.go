@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"time"
 
 	ohttp "github.com/Golamu/core/http"
@@ -22,12 +23,13 @@ type Context struct {
 	doneChannel chan bool
 	done        bool
 	startTime   time.Time
+	ctx         context.Context
 }
 
 // NewContext creates an http context object where you can define the request and response objects
 func NewContext(req IRequest, res IResponse) *Context {
 	var done = make(chan (bool), 1)
-	return &Context{req, res, done, false, time.Now()}
+	return &Context{req, res, done, false, time.Now(), context.Background()}
 }
 
 // AddError wraps the response's AddError
@@ -43,6 +45,11 @@ func (ctx *Context) GetDoneChannel() chan bool {
 // IsDone returns whether or not something has signalled a completion
 func (ctx *Context) IsDone() bool {
 	return ctx.done
+}
+
+// Context teturns the initialized context for this call
+func (ctx *Context) Context() context.Context {
+	return ctx.ctx
 }
 
 // Started returns the context's creation time

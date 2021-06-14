@@ -1,6 +1,7 @@
 package amazon
 
 import (
+	"context"
 	"time"
 
 	"github.com/Golamu/core/http"
@@ -15,6 +16,7 @@ type Context struct {
 	started     time.Time
 	doneChannel chan bool
 	done        bool
+	ctx         context.Context
 }
 
 // NewContext creates the request, response, and context objects for use in
@@ -29,6 +31,7 @@ func NewContext(req events.APIGatewayProxyRequest) *Context {
 		started:     time.Now().UTC(),
 		doneChannel: make(chan bool, 1),
 		done:        false,
+		ctx:         context.Background(),
 	}
 
 	return ctx
@@ -37,6 +40,11 @@ func NewContext(req events.APIGatewayProxyRequest) *Context {
 // IsDone returns whether or not the response has been finalized
 func (ctx *Context) IsDone() bool {
 	return ctx.done
+}
+
+// Context returns this "request context's" call contex
+func (ctx *Context) Context() context.Context {
+	return ctx.ctx
 }
 
 // GetRequest gets the context's request object

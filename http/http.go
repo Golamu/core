@@ -1,6 +1,9 @@
 package http
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // IRequest represents the basics an incoming request type needs to provide to process an incoming
 // request, independent of any endpoint provider
@@ -45,4 +48,5 @@ type IContext interface {
 	GetDoneChannel() chan bool
 
 	Started() time.Time
+	Context() context.Context
 }
