@@ -46,3 +46,19 @@ func ConflictException(ctx IContext, msg string, err string) {
 	res.AddMessage(msg)
 	res.SetCode(409)
 }
+
+// UnauthorizedException provides a default exception for unauthorized access attempts
+func UnauthorizedException(ctx IContext) {
+	res := ctx.GetResponse()
+	res.SetCode(Unauthorized)
+	res.AddError("You are not authorized to access this resource")
+	res.AddError("Verify you have a valid auth token, or that you have permission to access this")
+}
+
+// UnauthorizedExceptionCauseBy lets you create an unauthorized exception with a specific message
+func UnauthorizedExceptionCauseBy(ctx IContext, msg string) {
+	res := ctx.GetResponse()
+	res.AddError("You are not authorized to access this resource")
+	res.AddMessage(msg)
+	res.SetCode(Unauthorized)
+}
